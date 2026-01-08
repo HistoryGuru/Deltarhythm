@@ -46,6 +46,18 @@
         .ledger-beam { position: absolute; background: rgba(255,255,255,0.9); box-shadow: 0 0 20px white; display: flex; align-items: center; justify-content: space-around; overflow: hidden; }
         .clef-huge { font-size: 28px; font-weight: bold; color: black; pointer-events: none; }
         
+        .beam-oboe { 
+            position: absolute; 
+            width: 40px; 
+            height: 40px; 
+            background-image: url('https://i.imgur.com/L7Sy9vy.png');
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            image-rendering: pixelated;
+            z-index: 15;
+        }
+        
         .color-beam { position: absolute; width: 45px; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: space-around; border-left: 2px solid white; border-right: 2px solid white; }
 
         #flashOverlay { position: fixed; inset: 0; background: white; z-index: 200; opacity: 0; pointer-events: none; transition: opacity 0.15s; }
@@ -328,14 +340,17 @@
             p3Oboes = []; 
             beams = []; 
             colorBeams = [];
-            playerPos = { x: 50, y: 50 };
+            
+            // Spawn player at bottom corner for Phase 3 ring attack, center for others
+            if (currentPhase === 3 && patternIdx % 2 === 1) {
+                playerPos = { x: 15, y: 85 }; // Bottom left corner
+                ringGapRotation = 0;
+            } else {
+                playerPos = { x: 50, y: 50 }; // Center
+            }
+            
             frameCount = 0;
             lastBeamTime = 0;
-            
-            // Reset ring gap rotation at start of each dodge phase
-            if (currentPhase === 3 && patternIdx % 2 === 1) {
-                ringGapRotation = 0;
-            }
             
             setTimeout(() => { 
                 if(gameState === 'dodge') {
@@ -443,11 +458,11 @@
             } else {
                 let p1Mode = patternIdx % 2;
                 if (p1Mode === 0) {
-                    if (Math.random() < 0.08) attacks.push({x: Math.random()*100, y:0, vx:0, vy:2.1, type:'feather'});
+                    if (Math.random() < 0.06) attacks.push({x: Math.random()*100, y:0, vx:0, vy:1.6, type:'feather'});
                 } else {
-                    if (Math.random() < 0.11) {
+                    if (Math.random() < 0.08) {
                         let side = Math.random() > 0.5 ? 0 : 100;
-                        attacks.push({x: side, y: Math.random()*100, vx: side === 0 ? 2.1 : -2.1, vy: (50 - (Math.random()*100))/35, type:'pellet'});
+                        attacks.push({x: side, y: Math.random()*100, vx: side === 0 ? 1.6 : -1.6, vy: (50 - (Math.random()*100))/40, type:'pellet'});
                     }
                 }
             }
@@ -511,7 +526,12 @@
                         return `<div class="absolute text-white" style="left:${a.x}%; top:${a.y}%; transform:translate(-50%,-50%)">•</div>`;
                     }
                 }).join('')}
-                ${beams.map(b => `<div class="ledger-beam" style="left:${b.x}%; top:${b.y}%; width:${b.w}%; height:${b.h}%; opacity:${b.active ? 1 : 0.3};">${b.active ? '<span class="clef-huge">\u{1D11E}</span><span class="clef-huge">\u{1D11E}</span>' : ''}</div>`).join('')}
+                ${beams.map(b => {
+                    let isHorizontal = b.w > b.h;
+                    return `<div class="ledger-beam" style="left:${b.x}%; top:${b.y}%; width:${b.w}%; height:${b.h}%; opacity:${b.active ? 1 : 0.3};">
+                        ${b.active ? '<span class="clef-huge">\u{1D11E}</span><span class="clef-huge">\u{1D11E}</span>' : ''}
+                    </div>`;
+                }).join('')}
                 ${colorBeams.map(cb => `<div class="color-beam" style="left:${cb.x}%; transform:translateX(-50%); background:${cb.type === 'blue' ? 'rgba(0,191,255,0.7)' : 'rgba(255,165,0,0.7)'};"><span class="clef-huge" style="color:${cb.type === 'blue' ? '#00BFFF' : '#FFA500'}">\u{1D11E}</span></div>`).join('')}
                 ${p3Oboes.map(o => {
                     let style = o.top ? `top:0; height:${o.h}px;` : `bottom:0; height:${o.h}px;`;
@@ -523,7 +543,21 @@
                         ${keys}
                     </div>`;
                 }).join('')}
-            </div>`;
+            </div>
+            ${beams.map(b => {
+                let isHorizontal = b.w > b.h;
+                let oboeHTML = '';
+                if (isHorizontal) {
+                    // Horizontal beam - oboe on left side, OUTSIDE the box
+                    let topPos = 160 + (b.y * 3.2); // Convert % to pixels (320px box)
+                    oboeHTML = `<div class="beam-oboe" style="position:absolute; left:-45px; top:${topPos}px; transform:translateY(-50%);"></div>`;
+                } else {
+                    // Vertical beam - oboe on top, OUTSIDE the box, rotated 90 degrees
+                    let leftPos = (b.x * 3.2); // Convert % to pixels
+                    oboeHTML = `<div class="beam-oboe" style="position:absolute; top:-45px; left:${leftPos}px; transform:translateX(-50%) rotate(90deg);"></div>`;
+                }
+                return oboeHTML;
+            }).join('')}`;
             document.getElementById('boxContent').innerHTML = html;
         }
 
