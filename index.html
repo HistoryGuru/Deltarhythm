@@ -29,7 +29,7 @@
         @keyframes rainbow {
             0% { border-color: red; } 33% { border-color: yellow; } 66% { border-color: blue; } 100% { border-color: red; }
         }
-        .boss-img { width: 220px; height: auto; image-rendering: pixelated; animation: bounce 2s infinite; transition: all 0.5s; }
+        .boss-img { width: 220px; height: auto; image-rendering: pixelated; animation: bounce 2s infinite; transition: all 0.5s; position: relative; z-index: 1; }
         .boss-phase3 { width: 420px !important; }
         .goner { filter: brightness(0) invert(1); animation: goner-fade 2s forwards; }
         @keyframes goner-fade { 0% { opacity: 1; transform: scale(1.5); filter: blur(10px); } 100% { opacity: 0; } }
@@ -60,6 +60,35 @@
         
         .color-beam { position: absolute; width: 45px; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: space-around; border-left: 2px solid white; border-right: 2px solid white; }
 
+        @keyframes slash {
+            0% { width: 0; opacity: 1; }
+            50% { width: 100%; opacity: 1; }
+            100% { width: 100%; opacity: 0; }
+        }
+        @keyframes split-left {
+            0% { transform: translateX(0) rotate(0deg); opacity: 1; }
+            100% { transform: translateX(-100px) rotate(-45deg); opacity: 0; }
+        }
+        @keyframes split-right {
+            0% { transform: translateX(0) rotate(0deg); opacity: 1; }
+            100% { transform: translateX(100px) rotate(45deg); opacity: 0; }
+        }
+        .slash-effect {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background: white;
+            animation: slash 0.5s ease-out;
+            transform-origin: left;
+        }
+        .mercy-split-left {
+            animation: split-left 1s ease-out forwards;
+        }
+        .mercy-split-right {
+            animation: split-right 1s ease-out forwards;
+        }
+
         #flashOverlay { position: fixed; inset: 0; background: white; z-index: 200; opacity: 0; pointer-events: none; transition: opacity 0.15s; }
         #audioOverlay { position: fixed; inset: 0; background: black; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; }
     </style>
@@ -77,12 +106,15 @@
 
     <div class="min-h-screen flex flex-col items-center justify-center p-4">
         <div id="gameViewport" class="w-full max-w-3xl">
-            <div class="relative w-full flex flex-col items-center mb-8 h-72 justify-end">
+            <div class="relative w-full flex flex-col items-center mb-4">
                 <div id="bossTitle" class="text-[10px] text-gray-500 mb-2">Jeff the Mighty Avian</div>
-                <img id="bossSprite" src="https://imgur.com/Hb10RyW.png" class="boss-img">
-                <div class="w-64 h-4 bg-red-900 border-2 border-white mt-4">
+                <div class="w-64 h-4 bg-red-900 border-2 border-white mb-4">
                     <div id="bossHPBar" class="h-full bg-green-500 transition-all" style="width: 100%"></div>
                 </div>
+            </div>
+            
+            <div class="relative w-full flex flex-col items-center mb-8 h-72 justify-end">
+                <img id="bossSprite" src="https://imgur.com/Hb10RyW.png" class="boss-img">
             </div>
 
             <div id="mainBox" class="bg-black border-4 border-white p-8 min-h-[300px] relative flex flex-col justify-center overflow-hidden">
@@ -227,17 +259,68 @@
                     startTyping("* You rang the tuning fork. Nothing happened.");
                 }
             } else if (selectedAction === 3) {
-                if (selectedSubAction === 0 && mercy >= 100) {
-                    gameState = 'victory';
-                    document.getElementById('bossSprite').classList.add('goner');
-                    startTyping("* You spared Jeff. He flies away peacefully.");
-                    return;
-                } else if (selectedSubAction === 0) {
-                    startTyping("* Jeff's name isn't yellow yet.");
-                } else {
-                    startTyping("* You tried to flee, but you're determined to stay.");
-                }
+                // MERCY - Always rejected with dramatic effect
+                gameState = 'nomercy';
+                triggerMercySlash();
+                // Show NO MERCY instantly without typing animation
+                document.getElementById('boxContent').innerHTML = `<div class="text-lg">* NO MERCY!<div class="text-xs mt-4 text-gray-400">Press Z to return</div></div>`;
+                return;
             }
+        }
+
+        function triggerMercySlash() {
+            // Flash effect
+            triggerFlash();
+            
+            // Get mercy display safely
+            const mercyElement = document.getElementById('mercyVal');
+            if (!mercyElement) return;
+            
+            const mercyDisplay = mercyElement.parentElement;
+            if (!mercyDisplay) return;
+            
+            // Add slash effect
+            const slash = document.createElement('div');
+            slash.style.position = 'absolute';
+            slash.style.width = '100%';
+            slash.style.height = '2px';
+            slash.style.background = 'white';
+            slash.style.top = '50%';
+            slash.style.left = '0';
+            slash.style.zIndex = '1000';
+            slash.style.animation = 'slash 0.3s ease-out';
+            
+            mercyDisplay.style.position = 'relative';
+            mercyDisplay.appendChild(slash);
+            
+            // Split and decay mercy text
+            setTimeout(() => {
+                const leftHalf = document.createElement('span');
+                const rightHalf = document.createElement('span');
+                
+                leftHalf.textContent = 'MERC';
+                rightHalf.textContent = 'Y ' + mercy + '%';
+                
+                leftHalf.style.display = 'inline-block';
+                leftHalf.style.animation = 'split-left 1s ease-out forwards';
+                
+                rightHalf.style.display = 'inline-block';
+                rightHalf.style.animation = 'split-right 1s ease-out forwards';
+                
+                // Store original content
+                const hpDisplay = document.getElementById('playerHP');
+                const originalMercyText = 'HP ' + Math.ceil(hp) + '/20 | MERCY ' + mercy + '%';
+                
+                // Clear and add split halves
+                mercyDisplay.innerHTML = 'HP <span id="playerHP">' + Math.ceil(hp) + '</span>/20 | ';
+                mercyDisplay.appendChild(leftHalf);
+                mercyDisplay.appendChild(rightHalf);
+                
+                // Clean up after animation
+                setTimeout(() => {
+                    mercyDisplay.innerHTML = 'HP <span id="playerHP">' + Math.ceil(hp) + '</span>/20 | MERCY <span id="mercyVal">' + mercy + '</span>%';
+                }, 1000);
+            }, 300);
         }
 
         function updateSubMenu() {
@@ -273,8 +356,13 @@
                     if (bossHP <= 0) {
                         gameState = 'victory';
                         document.getElementById('bossSprite').classList.add('goner');
-                        startTyping("A final bow.");
-                    } else if (bossHP <= 1250 && currentPhase < 3) {
+                        document.getElementById('boxContent').innerHTML = `<div class="text-center">
+                            <div class="text-yellow-400 text-3xl mb-4">VICTORY!</div>
+                            <div class="text-lg">* You defeated Jeff the Mighty Avian.</div>
+                            <div class="text-sm mt-4 text-gray-400">Reloading...</div>
+                        </div>`;
+                        setTimeout(() => location.reload(), 5000);
+                    } else if (bossHP <= 2500 && currentPhase < 3) {
                         currentPhase = 3; patternIdx = 0;
                         triggerFlash();
                         document.getElementById('bossSprite').src = "https://imgur.com/heB0IRZ.png";
@@ -322,7 +410,10 @@
         }
 
         function updateBossUI() {
-            document.getElementById('bossHPBar').style.width = (bossHP/5000)*100 + "%";
+            const bossHPBar = document.getElementById('bossHPBar');
+            if (bossHPBar) {
+                bossHPBar.style.width = (bossHP/5000)*100 + "%";
+            }
         }
 
         function startDodge() {
@@ -379,9 +470,13 @@
                 updateDodge(t);
                 renderDodge();
             }
-            // Always update HUD
-            document.getElementById('playerHP').innerText = Math.ceil(hp);
-            document.getElementById('mercyVal').innerText = mercy;
+            // Always update HUD (unless in gameover/victory)
+            if (gameState !== 'gameover' && gameState !== 'victory') {
+                const playerHPEl = document.getElementById('playerHP');
+                const mercyValEl = document.getElementById('mercyVal');
+                if (playerHPEl) playerHPEl.innerText = Math.ceil(hp);
+                if (mercyValEl) mercyValEl.innerText = mercy;
+            }
             requestAnimationFrame(gameLoop);
         }
 
@@ -509,7 +604,12 @@
                 });
             }
             
-            if (hp <= 0) location.reload();
+            // Check for death
+            if (hp <= 0) {
+                gameState = 'gameover';
+                document.getElementById('boxContent').innerHTML = `<div class="text-center text-red-600 text-3xl animate-pulse">GAME OVER</div>`;
+                setTimeout(() => location.reload(), 3000);
+            }
         }
 
         function renderDodge() {
@@ -623,6 +723,12 @@
                     if (selectedAction === 3 && selectedSubAction > 1) selectedSubAction = 0;
                     updateSubMenu();
                 }
+                if (key === 'z') {
+                    enterMenu();
+                }
+            }
+            
+            if (gameState === 'nomercy') {
                 if (key === 'z') {
                     enterMenu();
                 }
