@@ -43,6 +43,20 @@
         .note-head { position: absolute; bottom: 0; left: 0; width: 8px; height: 6px; background: white; border-radius: 50%; }
         .note-stem { position: absolute; bottom: 3px; left: 6px; width: 2px; height: 15px; background: white; }
         
+        .sword { width: 20px; height: 4px; position: absolute; z-index: 10; }
+        .sword-blade { position: absolute; left: 0; top: 0; width: 14px; height: 4px; background: white; }
+        .sword-hilt { position: absolute; left: 14px; top: -2px; width: 2px; height: 8px; background: white; }
+        .sword-pommel { position: absolute; left: 16px; top: 1px; width: 4px; height: 2px; background: white; }
+        
+        .giant-sword { position: absolute; width: 60px; height: 100%; display: flex; align-items: center; justify-content: center; border-left: 3px solid white; border-right: 3px solid white; z-index: 5; }
+        .giant-sword-inner { width: 30px; height: 80%; background: white; clip-path: polygon(50% 0%, 60% 10%, 60% 85%, 70% 85%, 50% 100%, 30% 85%, 40% 85%, 40% 10%); }
+        
+        .giant-sword-pivot { position: absolute; top: -50px; left: 50%; width: 80px; height: 180px; transform-origin: 50% 0%; z-index: 5; }
+        .giant-sword-blade { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 12px; height: 140px; background: white; }
+        .giant-sword-crossguard { position: absolute; bottom: 140px; left: 50%; transform: translateX(-50%); width: 40px; height: 6px; background: white; }
+        .giant-sword-handle { position: absolute; bottom: 146px; left: 50%; transform: translateX(-50%); width: 8px; height: 24px; background: white; }
+        .giant-sword-pommel { position: absolute; bottom: 170px; left: 50%; transform: translateX(-50%); width: 14px; height: 10px; background: white; border-radius: 2px; }
+        
         .ledger-beam { position: absolute; background: rgba(255,255,255,0.9); box-shadow: 0 0 20px white; display: flex; align-items: center; justify-content: space-around; overflow: hidden; }
         .clef-huge { font-size: 28px; font-weight: bold; color: black; pointer-events: none; }
         
@@ -141,14 +155,16 @@
         let hp = 20, bossHP = 5000, mercy = 0, currentPhase = 1, patternIdx = 0;
         let typedText = "", isTyping = false, typeTimer = null, fullText = '';
         let introLines = ["It's a beautiful day outside.", "The sun is shining...", "Birds are singing...", "Kids like you...", "Should be practicing your oboe."];
-        let attacks = [], p3Oboes = [], beams = [], colorBeams = [];
+        let attacks = [], p3Oboes = [], beams = [], colorBeams = [], giantSwords = [];
         let playerPos = { x: 50, y: 50 }, prevPos = { x: 50, y: 50 };
         const keys = {};
         let frameCount = 0;
         let lastBeamTime = 0;
+        let lastGiantSwordTime = 0;
         let selectedAction = 0;
         let selectedSubAction = 0;
         let currentTextSound = null;
+        let ringGapRotation = 0;
 
         function startEverything() {
             document.getElementById('audioOverlay').style.display = 'none';
@@ -395,10 +411,13 @@
                                 quote = "* Stay in tune with the colors!";
                             }
                         } else if (currentPhase === 3) {
-                            if (patternIdx % 2 === 0) {
+                            let p3Pattern = patternIdx % 3;
+                            if (p3Pattern === 0) {
                                 quote = "* Perish Fool!";
+                            } else if (p3Pattern === 1) {
+                                quote = "* Feel the rhythm of destruction!";
                             } else {
-                                quote = "* Music is the ultimate weapon!";
+                                quote = "* En garde!";
                             }
                         }
                         
@@ -431,9 +450,10 @@
             p3Oboes = []; 
             beams = []; 
             colorBeams = [];
+            giantSwords = [];
             
             // Spawn player at bottom corner for Phase 3 ring attack, center for others
-            if (currentPhase === 3 && patternIdx % 2 === 1) {
+            if (currentPhase === 3 && patternIdx % 3 === 1) {
                 playerPos = { x: 15, y: 85 }; // Bottom left corner
                 ringGapRotation = 0;
             } else {
@@ -442,6 +462,7 @@
             
             frameCount = 0;
             lastBeamTime = 0;
+            lastGiantSwordTime = 0;
             
             setTimeout(() => { 
                 if(gameState === 'dodge') {
@@ -451,6 +472,7 @@
                     p3Oboes = [];
                     beams = [];
                     colorBeams = [];
+                    giantSwords = [];
                     
                     gameState = 'action';
                     selectedAction = 0;
@@ -502,9 +524,16 @@
 
             // Spawn attacks based on current phase and pattern
             if (currentPhase === 3) {
-                let p3Mode = patternIdx % 2;
-                if (p3Mode === 1) {
-                    // Continuously fire rings with gaps - every 25 frames with VERY slow movement
+                let p3Mode = patternIdx % 3;
+                if (p3Mode === 0) {
+                    // Oboe rush
+                    if (frameCount % 2 === 0) {
+                        let center = Math.sin(frameCount/30)*50 + 100;
+                        p3Oboes.push({x: 100, h: center - 55, top: true});
+                        p3Oboes.push({x: 100, h: 320 - (center + 55), top: false});
+                    }
+                } else if (p3Mode === 1) {
+                    // Continuously fire rings with gaps - every 25 frames
                     if (frameCount % 25 === 0) { 
                         // Spawn 16 clefs in a circle (skipping 2 for a gap)
                         for(let i=0; i<16; i++) {
@@ -516,8 +545,8 @@
                                 attacks.push({
                                     x: 50, 
                                     y: 50, 
-                                    vx: Math.cos(i*Math.PI/8)*1.2, 
-                                    vy: Math.sin(i*Math.PI/8)*1.2, 
+                                    vx: Math.cos(i*Math.PI/8)*2.5, 
+                                    vy: Math.sin(i*Math.PI/8)*2.5, 
                                     type: 'clef'
                                 });
                             }
@@ -526,11 +555,36 @@
                         ringGapRotation += 2;
                     }
                 } else {
-                    // Oboe rush
-                    if (frameCount % 2 === 0) {
-                        let center = Math.sin(frameCount/30)*50 + 100;
-                        p3Oboes.push({x: 100, h: center - 55, top: true});
-                        p3Oboes.push({x: 100, h: 320 - (center + 55), top: false});
+                    // Combined small sword + ledger beams attack
+                    // Small tracking swords - spawn from all sides
+                    let activeSwords = attacks.filter(a => a.type === 'sword').length;
+                    if (frameCount % 50 === 0 && activeSwords < 5) {
+                        // Spawn from top
+                        let angle = Math.atan2(playerPos.y - 0, playerPos.x - (Math.random()*100));
+                        attacks.push({x: Math.random()*100, y: 0, vx: Math.cos(angle)*0.75, vy: Math.sin(angle)*0.75, type: 'sword', spawnTime: frameCount});
+                        
+                        // Spawn from bottom
+                        angle = Math.atan2(playerPos.y - 100, playerPos.x - (Math.random()*100));
+                        attacks.push({x: Math.random()*100, y: 100, vx: Math.cos(angle)*0.75, vy: Math.sin(angle)*0.75, type: 'sword', spawnTime: frameCount});
+                        
+                        // Spawn from left
+                        angle = Math.atan2(playerPos.y - (Math.random()*100), playerPos.x - 0);
+                        attacks.push({x: 0, y: Math.random()*100, vx: Math.cos(angle)*0.75, vy: Math.sin(angle)*0.75, type: 'sword', spawnTime: frameCount});
+                        
+                        // Spawn from right
+                        angle = Math.atan2(playerPos.y - (Math.random()*100), playerPos.x - 100);
+                        attacks.push({x: 100, y: Math.random()*100, vx: Math.cos(angle)*0.75, vy: Math.sin(angle)*0.75, type: 'sword', spawnTime: frameCount});
+                    }
+                    
+                    // Ledger beams with swords
+                    if (frameCount - lastBeamTime > 60) {
+                        let beam = Math.random() > 0.5 
+                            ? {x: Math.random()*80, y: 0, w: 22, h: 100, active: false} 
+                            : {x: 0, y: Math.random()*80, w: 100, h: 22, active: false};
+                        beams.push(beam);
+                        setTimeout(() => beam.active = true, 500);
+                        setTimeout(() => beams = beams.filter(b => b !== beam), 900);
+                        lastBeamTime = frameCount;
                     }
                 }
             } else if (currentPhase === 2) {
@@ -567,12 +621,45 @@
 
             colorBeams.forEach(cb => cb.x -= 2.8);
             colorBeams = colorBeams.filter(cb => cb.x > -10);
+            
+            // Update giant sword swing
+            giantSwords.forEach(gs => {
+                if (gs.active) {
+                    gs.angle += gs.rotationSpeed;
+                    // Change color every 120 degrees (full rotation every 360)
+                    if (gs.angle % 120 < gs.rotationSpeed) {
+                        gs.type = gs.type === 'blue' ? 'orange' : 'blue';
+                    }
+                }
+            });
 
             attacks.forEach((a, idx) => {
+                // Track player for swords
+                if (a.type === 'sword') {
+                    let angle = Math.atan2(playerPos.y - a.y, playerPos.x - a.x);
+                    let speed = 0.6;
+                    a.vx = Math.cos(angle) * speed;
+                    a.vy = Math.sin(angle) * speed;
+                }
+                
                 a.x += a.vx; a.y += a.vy;
                 if (Math.hypot(a.x - playerPos.x, a.y - playerPos.y) < 5) {
-                    hp -= 0.35;
+                    if (a.type === 'sword') {
+                        hp -= 1;
+                        a.hit = true;
+                    } else {
+                        hp -= 0.35;
+                    }
                 }
+            });
+            
+            // Remove hit swords and old swords
+            attacks = attacks.filter(a => {
+                if (a.type === 'sword' && a.hit) return false;
+                if (a.type === 'sword' && a.spawnTime) {
+                    return (frameCount - a.spawnTime) < 300;
+                }
+                return true;
             });
 
             beams.forEach(b => {
@@ -594,8 +681,47 @@
                     }
                 }
             });
+            
+            giantSwords.forEach(gs => {
+                if (gs.active) {
+                    // Calculate sword blade position based on rotation
+                    let swordCenterX = 50; // Fixed at center
+                    let swordCenterY = 50; // Center of screen
+                    let bladeLength = 45; // Length in % units
+                    
+                    // Convert angle to radians
+                    let radians = gs.angle * Math.PI / 180;
+                    
+                    // Calculate blade endpoint
+                    let bladeEndX = swordCenterX + Math.cos(radians) * bladeLength;
+                    let bladeEndY = swordCenterY + Math.sin(radians) * bladeLength;
+                    
+                    // Check if player is near the blade
+                    let dx = bladeEndX - swordCenterX;
+                    let dy = bladeEndY - swordCenterY;
+                    let t = ((playerPos.x - swordCenterX) * dx + (playerPos.y - swordCenterY) * dy) / (dx * dx + dy * dy);
+                    t = Math.max(0, Math.min(1, t));
+                    
+                    let closestX = swordCenterX + t * dx;
+                    let closestY = swordCenterY + t * dy;
+                    let distToLine = Math.hypot(playerPos.x - closestX, playerPos.y - closestY);
+                    
+                    if (distToLine < 6 && !gs.hit) {
+                        if (gs.type === 'blue' && !moving) {
+                            gs.hit = true;
+                            hp -= 0.5;
+                            setTimeout(() => gs.hit = false, 30); // Reset hit flag quickly
+                        } else if (gs.type === 'orange' && moving) {
+                            gs.hit = true;
+                            hp -= 0.5;
+                            setTimeout(() => gs.hit = false, 30);
+                        }
+                    }
+                }
+            });
+            
 
-            if (currentPhase === 3 && (patternIdx % 2 === 0)) {
+            if (currentPhase === 3 && (patternIdx % 3 === 0)) {
                 let py = (playerPos.y/100)*320;
                 p3Oboes.forEach(o => {
                     if (Math.abs(o.x - playerPos.x) < 5) {
@@ -619,9 +745,19 @@
                     if (a.type === 'note') {
                         return `<div class="music-note" style="left:${a.x}%; top:${a.y}%; transform:translate(-50%,-50%);"><div class="note-head"></div><div class="note-stem"></div></div>`;
                     } else if (a.type === 'clef') {
-                        return `<div class="absolute text-white text-xl" style="left:${a.x}%; top:${a.y}%; transform:translate(-50%,-50%)">\u{1D11E}</div>`;
+                        return `<div class="music-note" style="left:${a.x}%; top:${a.y}%; transform:translate(-50%,-50%); z-index: 50;">
+                            <div class="note-head"></div>
+                            <div class="note-stem"></div>
+                        </div>`;
                     } else if (a.type === 'feather') {
                         return `<div class="absolute text-white" style="left:${a.x}%; top:${a.y}%; transform:translate(-50%,-50%)">|</div>`;
+                    } else if (a.type === 'sword') {
+                        let rotation = Math.atan2(a.vy, a.vx) * 180 / Math.PI;
+                        return `<div class="sword" style="left:${a.x}%; top:${a.y}%; transform:translate(-50%,-50%) rotate(${rotation}deg);">
+                            <div class="sword-blade"></div>
+                            <div class="sword-hilt"></div>
+                            <div class="sword-pommel"></div>
+                        </div>`;
                     } else {
                         return `<div class="absolute text-white" style="left:${a.x}%; top:${a.y}%; transform:translate(-50%,-50%)">•</div>`;
                     }
@@ -629,7 +765,7 @@
                 ${beams.map(b => {
                     let isHorizontal = b.w > b.h;
                     return `<div class="ledger-beam" style="left:${b.x}%; top:${b.y}%; width:${b.w}%; height:${b.h}%; opacity:${b.active ? 1 : 0.3};">
-                        ${b.active ? '<span class="clef-huge">\u{1D11E}</span><span class="clef-huge">\u{1D11E}</span>' : ''}
+                        ${b.active ? '<div class="music-note" style="position: relative; display: inline-block;"><div class="note-head"></div><div class="note-stem"></div></div><div class="music-note" style="position: relative; display: inline-block;"><div class="note-head"></div><div class="note-stem"></div></div>' : ''}
                     </div>`;
                 }).join('')}
                 ${colorBeams.map(cb => `<div class="color-beam" style="left:${cb.x}%; transform:translateX(-50%); background:${cb.type === 'blue' ? 'rgba(0,191,255,0.7)' : 'rgba(255,165,0,0.7)'};"><span class="clef-huge" style="color:${cb.type === 'blue' ? '#00BFFF' : '#FFA500'}">\u{1D11E}</span></div>`).join('')}
